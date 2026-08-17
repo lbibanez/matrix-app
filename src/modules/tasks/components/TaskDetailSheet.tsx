@@ -3,6 +3,7 @@ import { taskService } from '../services/taskService';
 import { db } from '../../../core/db/dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
+import { useState } from 'react';
 
 interface TaskDetailSheetProps {
   taskId: string | null;
@@ -14,6 +15,9 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
     async () => (taskId ? await db.tasks.get(taskId) : null),
     [taskId]
   );
+
+  const [completing, setCompleting] = useState(false);
+  const [poppingSubtask, setPoppingSubtask] = useState<string | null>(null);
 
   const handleDelete = async () => {
     if (task && confirm('Delete this task?')) {
@@ -31,24 +35,30 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
     try {
       if (task.status === 'completed') {
         await taskService.updateTask(task.id, { status: 'pending' });
+        onClose();
       } else {
+        setCompleting(true);
         await taskService.completeTask(task.id);
+        setTimeout(() => { onClose(); setCompleting(false); }, 600);
       }
-      onClose();
     } catch (err) {
       console.error(err);
+      setCompleting(false);
     }
   };
 
   const toggleSubtask = async (subtaskId: string, currentCompleted: boolean) => {
     if (!task?.subtasks) return;
     try {
+      setPoppingSubtask(subtaskId);
       const newSt = task.subtasks.map(st =>
         st.id === subtaskId ? { ...st, completed: !currentCompleted } : st
       );
       await taskService.updateTask(task.id, { subtasks: newSt });
+      setTimeout(() => setPoppingSubtask(null), 400);
     } catch (err) {
       console.error(err);
+      setPoppingSubtask(null);
     }
   };
 
@@ -73,7 +83,13 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
         className={`mx-overlay${isOpen ? ' mx-overlay--open' : ''}`}
         onClick={onClose}
       />
-      <div className={`mx-sheet${isOpen ? ' mx-sheet--open' : ''}`}>
+      <div
+        className={`mx-sheet${isOpen ? ' mx-sheet--open' : ''}`}
+        style={{
+          background: completing ? '#EEF5F0' : undefined,
+          transition: 'background 0.4s ease',
+        }}
+      >
         <div className="mx-sheet-handle" />
         {task && (
           <div style={{ padding: '14px 22px 32px' }}>
@@ -109,12 +125,14 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
                         border: `1.5px solid ${st.completed ? '#1F5A37' : '#A4AAA5'}`,
                         background: st.completed ? '#1F5A37' : 'transparent',
                         color: '#fff', display: 'grid', placeItems: 'center',
-                        flexShrink: 0, transition: 'all 0.2s',
+                        flexShrink: 0,
+                        transform: poppingSubtask === st.id ? 'scale(1.3)' : 'scale(1)',
+                        transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s, border-color 0.2s',
                       }}
                     >
                       {st.completed && <Check size={11} strokeWidth={3} />}
                     </button>
-                    <span style={{ textDecoration: st.completed ? 'line-through' : 'none', opacity: st.completed ? 0.5 : 1 }}>
+                    <span style={{ textDecoration: st.completed ? 'line-through' : 'none', opacity: st.completed ? 0.5 : 1, transition: 'opacity 0.3s, text-decoration 0.3s' }}>
                       {st.title}
                     </span>
                   </div>
@@ -125,8 +143,16 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
             {/* Actions */}
             <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
               <button className="mx-danger-btn" onClick={handleDelete}>Delete</button>
-              <button className="mx-complete-btn" onClick={handleCompleteToggle}>
-                {isCompleted ? 'Mark active' : 'Complete task'}
+              <button
+                className="mx-complete-btn"
+                onClick={handleCompleteToggle}
+                style={{
+                  background: completing ? '#16462B' : undefined,
+                  transform: completing ? 'scale(0.97)' : undefined,
+                  transition: 'background 0.3s, transform 0.3s',
+                }}
+              >
+                {completing ? '✓ Done!' : isCompleted ? 'Mark active' : 'Complete task'}
               </button>
             </div>
           </div>

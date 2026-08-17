@@ -14,7 +14,13 @@ export function AppShell() {
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
+  const [toast, setToast] = useState<string | null>(null);
   const { user } = useAuth();
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  };
 
   useEffect(() => {
     if (user) {
@@ -93,9 +99,12 @@ export function AppShell() {
       {/* ── Create Sheet ── */}
       <TaskCreateSheet 
         isOpen={isCreateOpen} 
-        onClose={() => setIsCreateOpen(false)} 
+        onClose={(saved) => { setIsCreateOpen(false); if (saved) showToast('Task added ✓'); }} 
         defaultDate={activeTab === 'today' ? new Date() : (activeTab === 'calendar' ? calendarDate : undefined)}
       />
+
+      {/* ── Toast ── */}
+      <div className={`mx-toast${toast ? ' mx-toast--show' : ''}`}>{toast}</div>
     </div>
   );
 }

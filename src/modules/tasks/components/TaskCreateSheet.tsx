@@ -11,7 +11,7 @@ import {
 
 interface TaskCreateSheetProps {
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (saved?: boolean) => void;
   defaultDate?: Date;
 }
 
@@ -502,7 +502,7 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
           if (st.trim()) await taskService.addSubtask(task.id, st.trim());
         }
       }
-      onClose();
+      onClose(true); // pass true = saved successfully
     } catch (err: any) {
       console.error(err);
       alert(`Failed to save task: ${err.message || 'Unknown error'}`);
@@ -528,7 +528,7 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
       {/* Main overlay */}
       <div
         className={`mx-overlay${isOpen && !showCalPicker && !showTimePicker && !showRepeatPicker ? ' mx-overlay--open' : ''}`}
-        onClick={onClose}
+        onClick={() => onClose()}
       />
 
       {/* Main sheet */}

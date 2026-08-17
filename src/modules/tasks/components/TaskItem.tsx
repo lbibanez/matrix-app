@@ -13,20 +13,30 @@ interface TaskItemProps {
 export function TaskItem({ task, isOverdue = false }: TaskItemProps) {
   const { openTask } = useTaskDetail();
   const [isToggling, setIsToggling] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const [exiting, setExiting] = useState(false);
   const isCompleted = task.status === 'completed';
 
+  // When completing (not un-completing), play exit animation before DB write finalises
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isToggling) return;
+    setIsToggling(true);
     try {
-      setIsToggling(true);
       if (isCompleted) {
+        // Un-complete — no animation needed, just restore
         await taskService.updateTask(task.id, { status: 'pending' });
       } else {
+        // Show check burst first, then slide out
+        setJustCompleted(true);
         await taskService.completeTask(task.id);
+        // Wait for check animation, then exit
+        setTimeout(() => setExiting(true), 380);
       }
     } catch (err) {
       console.error(err);
+      setJustCompleted(false);
+      setExiting(false);
     } finally {
       setIsToggling(false);
     }
@@ -38,15 +48,31 @@ export function TaskItem({ task, isOverdue = false }: TaskItemProps) {
 
   return (
     <div
-      onClick={() => openTask(task.id)}
+      onClick={() => !justCompleted && openTask(task.id)}
       className={`mx-task${isCompleted ? ' is-done' : ''}`}
+      style={{
+        // Slide-up + fade exit
+        transition: exiting
+          ? 'opacity 0.35s ease, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), max-height 0.4s ease 0.1s, margin 0.4s ease 0.1s, padding 0.4s ease 0.1s'
+          : undefined,
+        opacity: exiting ? 0 : 1,
+        transform: exiting ? 'scale(0.95) translateY(-6px)' : undefined,
+        maxHeight: exiting ? 0 : 200,
+        overflow: exiting ? 'hidden' : undefined,
+        marginBottom: exiting ? 0 : undefined,
+        padding: exiting ? '0 14px' : undefined,
+        pointerEvents: exiting ? 'none' : undefined,
+      }}
     >
       <button
         onClick={handleToggle}
         disabled={isToggling}
-        className={`mx-check${isCompleted ? ' mx-check--done' : isOverdue ? ' mx-check--overdue' : ''}`}
+        className={`mx-check${(isCompleted || justCompleted) ? ' mx-check--done' : isOverdue ? ' mx-check--overdue' : ''}`}
         aria-label={isCompleted ? 'Mark incomplete' : 'Complete task'}
-        style={{ opacity: isToggling ? 0.5 : 1 }}
+        style={{
+          transform: justCompleted ? 'scale(1.25)' : 'scale(1)',
+          transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s, border-color 0.25s',
+        }}
       >
         <Check className="mx-check-icon" strokeWidth={3} />
       </button>
@@ -58,6 +84,7 @@ export function TaskItem({ task, isOverdue = false }: TaskItemProps) {
           lineHeight: 1.35,
           textDecoration: isCompleted ? 'line-through' : 'none',
           color: isCompleted ? '#8A8E91' : '#171717',
+          transition: 'color 0.3s, text-decoration 0.3s',
         }}>
           {task.title}
         </div>
