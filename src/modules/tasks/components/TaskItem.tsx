@@ -29,9 +29,20 @@ export function TaskItem({ task, isOverdue = false }: TaskItemProps) {
       } else {
         // Show check burst first, then slide out
         setJustCompleted(true);
-        await taskService.completeTask(task.id);
         // Wait for check animation, then exit
-        setTimeout(() => setExiting(true), 380);
+        setTimeout(() => {
+          setExiting(true);
+          // Wait for exit animation, then update DB
+          setTimeout(async () => {
+            try {
+              await taskService.completeTask(task.id);
+            } catch (err) {
+              console.error(err);
+              setJustCompleted(false);
+              setExiting(false);
+            }
+          }, 350);
+        }, 380);
       }
     } catch (err) {
       console.error(err);

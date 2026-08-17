@@ -38,8 +38,17 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
         onClose();
       } else {
         setCompleting(true);
-        await taskService.completeTask(task.id);
-        setTimeout(() => { onClose(); setCompleting(false); }, 600);
+        // Play green wash for 400ms, then update DB and close
+        setTimeout(async () => {
+          try {
+            await taskService.completeTask(task.id);
+            onClose();
+            setCompleting(false);
+          } catch (e) {
+            console.error(e);
+            setCompleting(false);
+          }
+        }, 400);
       }
     } catch (err) {
       console.error(err);
