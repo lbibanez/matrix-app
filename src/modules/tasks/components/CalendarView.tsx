@@ -15,7 +15,7 @@ import {
   isToday,
 } from 'date-fns';
 
-export function CalendarView({ selectedDate, setSelectedDate }: { selectedDate: Date, setSelectedDate: (d: Date) => void }) {
+export function CalendarView({ selectedDate, setSelectedDate, highlightTaskId }: { selectedDate: Date, setSelectedDate: (d: Date) => void, highlightTaskId?: string | null }) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const { selectedDateTasks, hasTask, loading } = useCalendarTasks(selectedDate);
 
@@ -118,7 +118,7 @@ export function CalendarView({ selectedDate, setSelectedDate }: { selectedDate: 
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {selectedDateTasks.map(task => <TaskItem key={task.id} task={task} />)}
+            {selectedDateTasks.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
           </div>
         )}
       </section>

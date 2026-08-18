@@ -3,7 +3,7 @@ import { useTasks } from '../hooks/useTasks';
 import { TaskItem } from './TaskItem';
 import { format, parseISO } from 'date-fns';
 
-export function TaskList() {
+export function TaskList({ highlightTaskId }: { highlightTaskId?: string | null }) {
   const { tasks, completedTasks, grouped, loading } = useTasks();
   const [tab, setTab] = useState<'active' | 'completed'>('active');
 
@@ -72,7 +72,7 @@ export function TaskList() {
               <section style={{ marginTop: 28 }}>
                 <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 9, color: '#A95757' }}>Overdue</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {grouped.overdue.map(task => <TaskItem key={task.id} task={task} isOverdue={true} />)}
+                  {grouped.overdue.map(task => <TaskItem key={task.id} task={task} isOverdue={true} isHighlighted={task.id === highlightTaskId} />)}
                 </div>
               </section>
             )}
@@ -81,7 +81,7 @@ export function TaskList() {
               <section style={{ marginTop: 28 }}>
                 <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 9, color: '#1F5A37' }}>Today</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {grouped.today.map(task => <TaskItem key={task.id} task={task} />)}
+                  {grouped.today.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
                 </div>
               </section>
             )}
@@ -90,7 +90,7 @@ export function TaskList() {
               <section style={{ marginTop: 28 }}>
                 <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 9 }}>Tomorrow</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {grouped.tomorrow.map(task => <TaskItem key={task.id} task={task} />)}
+                  {grouped.tomorrow.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
                 </div>
               </section>
             )}
@@ -101,7 +101,7 @@ export function TaskList() {
                   {format(parseISO(dateStr), 'EEE, MMM d')}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {grouped.upcoming[dateStr].map(task => <TaskItem key={task.id} task={task} />)}
+                  {grouped.upcoming[dateStr].map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
                 </div>
               </section>
             ))}
@@ -110,7 +110,7 @@ export function TaskList() {
               <section style={{ marginTop: 28 }}>
                 <div style={{ fontSize: 14, fontWeight: 650, marginBottom: 9, color: '#9CA3AF' }}>No date</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {grouped.noDate.map(task => <TaskItem key={task.id} task={task} />)}
+                  {grouped.noDate.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
                 </div>
               </section>
             )}
@@ -125,7 +125,7 @@ export function TaskList() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {completedTasks.map(task => (
-              <TaskItem key={task.id} task={task} />
+              <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />
             ))}
           </div>
         )

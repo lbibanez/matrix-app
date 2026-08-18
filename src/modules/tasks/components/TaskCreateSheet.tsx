@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Calendar as CalendarIcon, Clock, Repeat as RepeatIcon, Trash2, ChevronLeft, ChevronRight, Check, X } from 'lucide-react';
 import { taskService } from '../services/taskService';
 import { useAuth } from '../../../core/auth/AuthContext';
-import { type RecurrenceRule } from '../../../core/db/dexie';
+import { type RecurrenceRule, type Task } from '../../../core/db/dexie';
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth,
   eachDayOfInterval, startOfWeek, endOfWeek,
@@ -11,8 +11,9 @@ import {
 
 interface TaskCreateSheetProps {
   isOpen: boolean;
-  onClose: (saved?: boolean) => void;
+  onClose: (savedTask?: any) => void;
   defaultDate?: Date;
+  editTask?: Task;
 }
 
 // ─── Mini Calendar Picker Sheet ───────────────────────────────────────────────
@@ -427,7 +428,7 @@ function RepeatPicker({
 }
 
 // ─── Main Create Sheet ────────────────────────────────────────────────────────
-export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateSheetProps) {
+export function TaskCreateSheet({ isOpen, onClose, defaultDate, editTask }: TaskCreateSheetProps) {
   const { user } = useAuth();
 
   const [title, setTitle] = useState('');
@@ -458,12 +459,51 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => titleInputRef.current?.focus(), 120);
-      if (defaultDate) {
-        setChosenDate(defaultDate);
-        setHasDate(true);
+
+      if (editTask) {
+        // Pre-populate from existing task
+        setTitle(editTask.title);
+        setDescription(editTask.description || '');
+        setRecurrence(editTask.recurrence_rule || null);
+
+        if (editTask.subtasks && editTask.subtasks.length > 0) {
+          setShowChecklist(true);
+          setSubtaskTitles(editTask.subtasks.map(st => st.title));
+        } else {
+          setShowChecklist(false);
+          setSubtaskTitles([]);
+        }
+
+        if (editTask.due_date) {
+          const d = new Date(editTask.due_date);
+          setChosenDate(d);
+          setHasDate(true);
+          if (!editTask.all_day) {
+            setHasTime(true);
+            let rawHour = d.getHours();
+            const rawMinute = d.getMinutes();
+            const p: 'AM' | 'PM' = rawHour >= 12 ? 'PM' : 'AM';
+            if (rawHour === 0) rawHour = 12;
+            else if (rawHour > 12) rawHour -= 12;
+            setHour(rawHour);
+            setMinute(rawMinute);
+            setPeriod(p);
+          } else {
+            setHasTime(false);
+          }
+        } else {
+          setHasDate(false);
+          setHasTime(false);
+        }
       } else {
-        setChosenDate(new Date());
-        setHasDate(false);
+        // New task defaults
+        if (defaultDate) {
+          setChosenDate(defaultDate);
+          setHasDate(true);
+        } else {
+          setChosenDate(new Date());
+          setHasDate(false);
+        }
       }
     } else {
       setTitle(''); setDescription('');
@@ -472,7 +512,7 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
       setRecurrence(null);
       setShowCalPicker(false); setShowTimePicker(false); setShowRepeatPicker(false);
     }
-  }, [isOpen, defaultDate]);
+  }, [isOpen, defaultDate, editTask]);
 
   const handleSave = async () => {
     if (!title.trim() || !user) return;
@@ -491,18 +531,46 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
         }
         isoDateStr = d.toISOString();
       }
-      const task = await taskService.createTask(user.id, title.trim(), {
-        description: description.trim(),
-        dueDate: isoDateStr,
-        allDay: !hasTime,
-        recurrenceRule: recurrence || undefined,
-      });
-      if (showChecklist) {
-        for (const st of subtaskTitles) {
-          if (st.trim()) await taskService.addSubtask(task.id, st.trim());
+
+      if (editTask) {
+        // ── Edit mode ──────────────────────────────────────────────────────
+        await taskService.updateTask(editTask.id, {
+          title: title.trim(),
+          description: description.trim(),
+          due_date: isoDateStr ?? null,
+          all_day: !hasTime,
+          recurrence_rule: recurrence || null,
+        });
+        // Update subtasks: replace the whole subtask list
+        if (showChecklist) {
+          const newSubtasks = subtaskTitles
+            .filter(t => t.trim())
+            .map((t, i) => ({
+              // Reuse existing subtask ID if available, otherwise new
+              id: editTask.subtasks?.[i]?.id ?? crypto.randomUUID(),
+              title: t.trim(),
+              completed: editTask.subtasks?.[i]?.completed ?? false,
+            }));
+          await taskService.updateTask(editTask.id, { subtasks: newSubtasks });
+        } else {
+          await taskService.updateTask(editTask.id, { subtasks: [] });
         }
+        onClose(); // edit doesn't navigate anywhere
+      } else {
+        // ── Create mode ────────────────────────────────────────────────────
+        const task = await taskService.createTask(user.id, title.trim(), {
+          description: description.trim(),
+          dueDate: isoDateStr,
+          allDay: !hasTime,
+          recurrenceRule: recurrence || undefined,
+        });
+        if (showChecklist) {
+          for (const st of subtaskTitles) {
+            if (st.trim()) await taskService.addSubtask(task.id, st.trim());
+          }
+        }
+        onClose(task);
       }
-      onClose(true); // pass true = saved successfully
     } catch (err: any) {
       console.error(err);
       alert(`Failed to save task: ${err.message || 'Unknown error'}`);
@@ -536,7 +604,7 @@ export function TaskCreateSheet({ isOpen, onClose, defaultDate }: TaskCreateShee
         <div className="mx-sheet-handle" />
         <div style={{ padding: '14px 22px 32px' }}>
           <div style={{ fontSize: 20, fontWeight: 650, letterSpacing: '-0.02em', marginBottom: 18 }}>
-            New task
+            {editTask ? 'Edit task' : 'New task'}
           </div>
 
           <input

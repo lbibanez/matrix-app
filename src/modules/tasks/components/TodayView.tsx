@@ -4,7 +4,7 @@ import { TaskItem } from './TaskItem';
 import { format } from 'date-fns';
 import { Check } from 'lucide-react';
 
-export function TodayView() {
+export function TodayView({ highlightTaskId }: { highlightTaskId?: string | null }) {
   const { grouped, loading } = useTasks();
   const [showCompleted, setShowCompleted] = useState(false);
 
@@ -57,7 +57,7 @@ export function TodayView() {
             <div className="mx-section-title" style={{ color: '#A95757' }}>Overdue</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {overdue.map(task => <TaskItem key={task.id} task={task} isOverdue={true} />)}
+            {overdue.map(task => <TaskItem key={task.id} task={task} isOverdue={true} isHighlighted={task.id === highlightTaskId} />)}
           </div>
         </section>
       )}
@@ -69,7 +69,7 @@ export function TodayView() {
             <div className="mx-section-title">All day</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {allDayTasks.map(task => <TaskItem key={task.id} task={task} />)}
+            {allDayTasks.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
           </div>
         </section>
       )}
@@ -81,7 +81,7 @@ export function TodayView() {
             <div className="mx-section-title">Scheduled</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {scheduledTasks.map(task => <TaskItem key={task.id} task={task} />)}
+            {scheduledTasks.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
           </div>
         </section>
       )}
@@ -100,7 +100,7 @@ export function TodayView() {
           </button>
           {showCompleted && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-              {completedToday.map(task => <TaskItem key={task.id} task={task} />)}
+              {completedToday.map(task => <TaskItem key={task.id} task={task} isHighlighted={task.id === highlightTaskId} />)}
             </div>
           )}
         </section>

@@ -1,32 +1,48 @@
-import { Check } from 'lucide-react';
+import { Check, Pencil } from 'lucide-react';
 import { taskService } from '../services/taskService';
 import { db } from '../../../core/db/dexie';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface TaskDetailSheetProps {
   taskId: string | null;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
-  const task = useLiveQuery(
+export function TaskDetailSheet({ taskId, onClose, onEdit }: TaskDetailSheetProps) {
+  const liveTask = useLiveQuery(
     async () => (taskId ? await db.tasks.get(taskId) : null),
     [taskId]
   );
 
+  const [cachedTask, setCachedTask] = useState<any>(null);
+
+  useEffect(() => {
+    if (liveTask) {
+      setCachedTask(liveTask);
+    }
+  }, [liveTask]);
+
+  const task = liveTask || cachedTask;
+
   const [completing, setCompleting] = useState(false);
   const [poppingSubtask, setPoppingSubtask] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Reset confirm state when sheet closes
+  useEffect(() => {
+    if (!taskId) setShowDeleteConfirm(false);
+  }, [taskId]);
 
   const handleDelete = async () => {
-    if (task && confirm('Delete this task?')) {
-      try {
-        await taskService.deleteTask(task.id);
-        onClose();
-      } catch (err) {
-        console.error(err);
-      }
+    if (!task) return;
+    try {
+      await taskService.deleteTask(task.id);
+      onClose();
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -60,7 +76,7 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
     if (!task?.subtasks) return;
     try {
       setPoppingSubtask(subtaskId);
-      const newSt = task.subtasks.map(st =>
+      const newSt = task.subtasks.map((st: any) =>
         st.id === subtaskId ? { ...st, completed: !currentCompleted } : st
       );
       await taskService.updateTask(task.id, { subtasks: newSt });
@@ -96,7 +112,7 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
         className={`mx-sheet${isOpen ? ' mx-sheet--open' : ''}`}
         style={{
           background: completing ? '#EEF5F0' : undefined,
-          transition: 'background 0.4s ease',
+          transition: 'background 0.4s ease, transform 0.5s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       >
         <div className="mx-sheet-handle" />
@@ -150,20 +166,63 @@ export function TaskDetailSheet({ taskId, onClose }: TaskDetailSheetProps) {
             )}
 
             {/* Actions */}
-            <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
-              <button className="mx-danger-btn" onClick={handleDelete}>Delete</button>
-              <button
-                className="mx-complete-btn"
-                onClick={handleCompleteToggle}
-                style={{
-                  background: completing ? '#16462B' : undefined,
-                  transform: completing ? 'scale(0.97)' : undefined,
-                  transition: 'background 0.3s, transform 0.3s',
-                }}
-              >
-                {completing ? '✓ Done!' : isCompleted ? 'Mark active' : 'Complete task'}
-              </button>
-            </div>
+            {!showDeleteConfirm ? (
+              <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                {/* Edit button */}
+                {onEdit && (
+                  <button
+                    onClick={onEdit}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      padding: '12px 16px', borderRadius: 13, fontSize: 13, fontWeight: 600,
+                      background: '#F3F4F6', color: '#374151',
+                      transition: 'transform 0.15s',
+                    }}
+                  >
+                    <Pencil size={14} strokeWidth={2.5} /> Edit
+                  </button>
+                )}
+                <button className="mx-danger-btn" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+                <button
+                  className="mx-complete-btn"
+                  onClick={handleCompleteToggle}
+                  style={{
+                    background: completing ? '#16462B' : undefined,
+                    transform: completing ? 'scale(0.97)' : undefined,
+                    transition: 'background 0.3s, transform 0.3s',
+                  }}
+                >
+                  {completing ? '✓ Done!' : isCompleted ? 'Mark active' : 'Complete task'}
+                </button>
+              </div>
+            ) : (
+              /* Inline delete confirmation — no window.confirm() */
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontSize: 13, color: '#6B7280', marginBottom: 10, textAlign: 'center' }}>
+                  Delete "{task.title}"?
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => setShowDeleteConfirm(false)}
+                    style={{
+                      flex: 1, borderRadius: 13, padding: 12, fontSize: 13, fontWeight: 600,
+                      background: '#F3F4F6', color: '#374151', transition: 'opacity 0.15s',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    style={{
+                      flex: 1, borderRadius: 13, padding: 12, fontSize: 13, fontWeight: 600,
+                      background: '#C0392B', color: '#fff', transition: 'opacity 0.15s',
+                    }}
+                  >
+                    Confirm Delete
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

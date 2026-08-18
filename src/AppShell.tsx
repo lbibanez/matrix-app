@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Calendar, CheckSquare, Settings, Sun, Plus } from 'lucide-react';
 import { useAuth } from './core/auth/AuthContext';
 import { syncEngine } from './core/sync/syncEngine';
@@ -7,6 +7,9 @@ import { TaskCreateSheet } from './modules/tasks/components/TaskCreateSheet';
 import { TodayView } from './modules/tasks/components/TodayView';
 import { CalendarView } from './modules/tasks/components/CalendarView';
 import { SettingsView } from './modules/tasks/components/SettingsView';
+import { isBefore, isToday, startOfDay } from 'date-fns';
+import { type Task } from './core/db/dexie';
+import { ScrollContext } from './core/lib/ScrollContext';
 
 type Tab = 'today' | 'calendar' | 'tasks' | 'settings';
 
@@ -15,11 +18,31 @@ export function AppShell() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<Date>(new Date());
   const [toast, setToast] = useState<string | null>(null);
+  const [highlightTaskId, setHighlightTaskId] = useState<string | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const { user } = useAuth();
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
+  };
+
+  const handleTaskCreated = (task: Task) => {
+    let isTodayTask = false;
+    if (task.due_date) {
+      const dueDate = new Date(task.due_date);
+      const todayStart = startOfDay(new Date());
+      if (isBefore(dueDate, todayStart) || isToday(dueDate)) {
+        isTodayTask = true;
+      }
+    }
+
+    setHighlightTaskId(task.id);
+    if (!isTodayTask) {
+      setActiveTab('tasks');
+    }
+
+    setTimeout(() => setHighlightTaskId(null), 3000);
   };
 
   useEffect(() => {
@@ -33,15 +56,16 @@ export function AppShell() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'today': return <TodayView />;
-      case 'calendar': return <CalendarView selectedDate={calendarDate} setSelectedDate={setCalendarDate} />;
-      case 'tasks': return <TaskList />;
+      case 'today': return <TodayView highlightTaskId={highlightTaskId} />;
+      case 'calendar': return <CalendarView selectedDate={calendarDate} setSelectedDate={setCalendarDate} highlightTaskId={highlightTaskId} />;
+      case 'tasks': return <TaskList highlightTaskId={highlightTaskId} />;
       case 'settings': return <SettingsView />;
       default: return null;
     }
   };
 
   return (
+    <ScrollContext.Provider value={mainRef}>
     <div style={{ display: 'flex', height: '100%', width: '100%', background: '#F8F8F5', overflow: 'hidden', position: 'relative' }}>
 
       {/* ── Desktop Sidebar ── */}
@@ -71,7 +95,7 @@ export function AppShell() {
       </aside>
 
       {/* ── Main Content Area ── */}
-      <main className="no-scrollbar" style={{ flex: 1, height: '100%', overflowY: 'auto', scrollBehavior: 'smooth' }}>
+      <main ref={mainRef} className="no-scrollbar" style={{ flex: 1, height: '100%', overflowY: 'auto', scrollBehavior: 'smooth' }}>
         <div style={{ padding: '28px 22px 112px', maxWidth: 680, margin: '0 auto' }}>
           {renderContent()}
         </div>
@@ -99,12 +123,19 @@ export function AppShell() {
       {/* ── Create Sheet ── */}
       <TaskCreateSheet 
         isOpen={isCreateOpen} 
-        onClose={(saved) => { setIsCreateOpen(false); if (saved) showToast('Task added ✓'); }} 
+        onClose={(savedTask) => { 
+          setIsCreateOpen(false); 
+          if (savedTask) { 
+            showToast('Task added ✓'); 
+            setTimeout(() => handleTaskCreated(savedTask), 350);
+          } 
+        }} 
         defaultDate={activeTab === 'today' ? new Date() : (activeTab === 'calendar' ? calendarDate : undefined)}
       />
 
       {/* ── Toast ── */}
       <div className={`mx-toast${toast ? ' mx-toast--show' : ''}`}>{toast}</div>
     </div>
+    </ScrollContext.Provider>
   );
 }
